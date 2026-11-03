@@ -5,10 +5,10 @@ import streamlit as st
 import matplotlib.pyplot as plt
 
 # ---- Fixed GA Parameters (updated as requested) ----
-POP_SIZE = 200          # 1) population setup
-CHROM_LEN = 70          # 3) length of individuals
-TARGET_ONES = 40        # 2) optimum at ones == 40
-MAX_FITNESS = 70        # 4) return value is 70 when ones == 40
+POP_SIZE = 300          # 1) population setup
+CHROM_LEN = 80          # 3) length of individuals
+TARGET_ONES = 50        # 2) optimum at ones == 50
+MAX_FITNESS = 80        # 4) return value is 80 when ones == 50
 N_GENERATIONS = 50      # 5) number of generations
 
 # ---- GA Hyperparameters (simple & sensible) ----
@@ -20,7 +20,7 @@ MUTATION_RATE = 1.0 / CHROM_LEN  # ~1 bit flip expected per chromosome
 def fitness(individual: np.ndarray) -> float:
     """
     Fitness peaks when the number of 1s equals TARGET_ONES.
-    Max fitness is MAX_FITNESS (=70) at ones == 40.
+    Max fitness is MAX_FITNESS (=80) at ones == 50.
     """
     ones = int(individual.sum())
     return MAX_FITNESS - abs(ones - TARGET_ONES)
@@ -49,6 +49,8 @@ def mutate(individual: np.ndarray) -> np.ndarray:
 
 def evolve(pop: np.ndarray, generations: int):
     best_fitness_per_gen = []
+    avg_fitness_per_gen = []
+    worst_fitness_per_gen = []
     best_individual = None
     best_f = -np.inf
 
@@ -60,6 +62,8 @@ def evolve(pop: np.ndarray, generations: int):
         gen_best = pop[gen_best_idx]
         gen_best_f = fits[gen_best_idx]
         best_fitness_per_gen.append(float(gen_best_f))
+        avg_fitness_per_gen.append(float(fits.mean()))
+        worst_fitness_per_gen.append(float(fits.min()))
 
         if gen_best_f > best_f:
             best_f = float(gen_best_f)
@@ -76,15 +80,16 @@ def evolve(pop: np.ndarray, generations: int):
             new_pop.extend([c1, c2])
         pop = np.array(new_pop[:len(pop)], dtype=np.int8)
 
-    return best_individual, best_f, best_fitness_per_gen
+    return best_individual, best_f, best_fitness_per_gen, avg_fitness_per_gen, worst_fitness_per_gen
 
 # ---- Streamlit UI ----
-st.set_page_config(page_title="Bit Pattern GA (70 bits, target ones = 40)", page_icon="🧬", layout="centered")
+st.set_page_config(page_title=f"Bit Pattern GA ({CHROM_LEN} bits, target ones = {TARGET_ONES})", page_icon="🧬", layout="centered")
 
-st.title("🧬 Genetic Algorithm: Evolve a 70-bit Pattern")
+st.title(f"🧬 Genetic Algorithm: Evolve a {CHROM_LEN}-bit Pattern")
 st.caption(
-    "Fixed requirements: Population = 200, Chromosome Length = 70, Generations = 50.\n"
-    "Fitness peaks at ones = 40, with max fitness = 70."
+    f"Fixed requirements: Population = {POP_SIZE}, Chromosome Length = {CHROM_LEN}, "
+    f"Generations = {N_GENERATIONS}. Fitness peaks at ones = {TARGET_ONES}, "
+    f"with max fitness = {MAX_FITNESS}."
 )
 
 with st.expander("ℹ️ Problem setup (fixed by requirement)", expanded=True):
@@ -114,7 +119,7 @@ if run_btn:
 
     # Initialize and evolve
     population = init_population(POP_SIZE, CHROM_LEN)
-    best_ind, best_fit, curve = evolve(population, N_GENERATIONS)
+    best_ind, best_fit, curve, avg_curve, worst_curve = evolve(population, N_GENERATIONS)
 
     # Results
     ones_count = int(best_ind.sum())
@@ -129,17 +134,31 @@ if run_btn:
     # Convergence plot
     st.subheader("📉 Convergence (Best Fitness per Generation)")
     fig, ax = plt.subplots()
-    ax.plot(range(1, len(curve) + 1), curve, linewidth=2)
+    gens = range(1, len(curve) + 1)
+    ax.plot(gens, curve, linewidth=2, label="Best")
+    ax.plot(gens, avg_curve, linewidth=2, label="Average")
+    ax.plot(gens, worst_curve, linewidth=2, label="Worst")
+    ax.legend()
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Best Fitness")
+    ax.set_ylabel("Fitness")
     ax.set_title("GA Convergence")
     ax.grid(True, linestyle="--", alpha=0.5)
     st.pyplot(fig)
 
     # Validation note
     if best_fit == MAX_FITNESS and ones_count == TARGET_ONES:
-        st.success("Perfect match achieved: ones = 40 and fitness = 70 ✅")
+        st.success(f"Perfect match achieved: ones = {TARGET_ONES} and fitness = {MAX_FITNESS} ✅")
     else:
         st.info("GA may reach near-optimal solutions; try another seed to explore further.")
 
-st.caption("© 2025 Simple GA demo (70 bits, optimum at 40 ones).")
+with st.expander("How it works & complexity"):
+    st.markdown(
+        f"""
+**Fitness:** `f(x) = {MAX_FITNESS} - |ones(x) - {TARGET_ONES}|`, maximum {MAX_FITNESS} at {TARGET_ONES} ones.
+
+**Time complexity:** O(G x N x L) with G = {N_GENERATIONS}, N = {POP_SIZE}, L = {CHROM_LEN}.
+**Space complexity:** O(N x L) for the population.
+"""
+    )
+
+st.caption(f"BSD3513 Lab Report 2 - Simple GA ({CHROM_LEN} bits, optimum at {TARGET_ONES} ones).")
